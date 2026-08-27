@@ -3,144 +3,142 @@ package com.cubAIx.WhisperTimeSync;
 import java.util.Vector;
 
 public class CubaixAlignerSimple {
-	static final boolean _DEBUG = false;
+    static final boolean _DEBUG = false;
 
-	static double COST_INCREDIBLE = 1000000;
-	
-	boolean ignoreCase = false;
-	double compressPosFactor = 
-			//0;
-			1.0/100000.0;
-	public CubaixAlignerSimple(boolean aIgnoreCase) {
-		ignoreCase = aIgnoreCase;
-	}
-	public TokenizedSent syncMarks1to2(TokenizedSent aTS1,TokenizedSent aTS2) throws Exception {
-		Vector<Pair> aP12s = align(aTS1, aTS2);
-		TokenizedSent aFused = new TokenizedSent(null);
-		if(_DEBUG) {
-			System.out.println("\nSYNC: \n");
-		}
-		for(int p = 0;p < aP12s.size();p++) {
-			Pair aP12 = aP12s.elementAt(p);
-			if(_DEBUG) {
-				System.out.println(
-						(aP12.t1 == null ? "[✘]" : "["+aP12.t1.token.replaceAll("\r*\n", "\\\\n")+"]"+aP12.t1.kind)
-								+ "\t" + (aP12.t1 == null || aP12.t2 == null || !aP12.t1.token.equals(aP12.t2.token) ? "≠":"=") + "\t"
-								+(aP12.t2 == null ? "[✘]" : "["+aP12.t2.token.replaceAll("\r*\n", "\\\\n")+"]"+aP12.t2.kind)
-						);
-			}
-			if(aP12.t1 != null && aP12.t1.kind == Token.NSTOKEN_KIND.MARK) {
-				aFused.tokens.add(aP12.t1);
-			}
-			if(aP12.t2 != null && aP12.t2.kind != Token.NSTOKEN_KIND.MARK) {
-				aFused.tokens.add(aP12.t2);
-			}
-		}
-		return aFused;
-	}
-	
-	public Vector<Pair> align(TokenizedSent aTS1,TokenizedSent aTS2) throws Exception {
-		//Init
-		int[][] aChoices = new int[aTS1.tokens.size()+1][aTS2.tokens.size()+1];
-		double[][] aCosts = new double[aTS1.tokens.size()+1][aTS2.tokens.size()+1];
-		aChoices[0][0] = 0;
-		aCosts[0][0] = 0;
-		for(int x = 1;x<aTS1.tokens.size()+1;x++) {
-			aChoices[x][0] = 1;//Left
-			aCosts[x][0] = aCosts[x-1][0]+cost(aTS1.tokens.elementAt(x-1));
-		}
-		for(int y = 1;y<aTS2.tokens.size()+1;y++) {
-			aChoices[0][y] = 2;//Up
-			aCosts[0][y] = aCosts[0][y-1]+cost(aTS2.tokens.elementAt(y-1));
-		}
-		//Eval costs
-		for(int x = 1;x<aTS1.tokens.size()+1;x++) {
-			for(int y = 1;y<aTS2.tokens.size()+1;y++) {
-				double aCost = cost(aTS1.tokens.elementAt(x-1),aTS2.tokens.elementAt(y-1));
-				double aCost0 = aCosts[x-1][y-1]+aCost*0.99;
-				double aCost1 = aCosts[x-1][y]+cost(aTS1.tokens.elementAt(x-1));
-				double aCost2 = aCosts[x][y-1]+cost(aTS2.tokens.elementAt(y-1));
-				if(aCost0 <= aCost1 && aCost0 <= aCost2) {
-					aChoices[x][y] = 0;//Match
-					aCosts[x][y] = aCost0;
-				}
-				else if(aCost1 < aCost2) {
-					aChoices[x][y] = 1;//Left
-					aCosts[x][y] = aCost1;
-				}
-				else {
-					aChoices[x][y] = 2;//Up
-					aCosts[x][y] = aCost2;
-				}
-			}
-		}
+    static double COST_INCREDIBLE = 1000000;
 
-		//Backprop
-		int x = aTS1.tokens.size();
-		int y = aTS2.tokens.size();
-		Vector<Pair> aPs = new Vector<Pair>();
-		while(x > 0 || y > 0) {
-			Pair aP = new Pair(); 
-			if(aChoices[x][y] == 0) {
-				aP.t1 = aTS1.tokens.elementAt(--x);
-				aP.t2 = aTS2.tokens.elementAt(--y);
-			}
-			else if(aChoices[x][y] == 1) {
-				aP.t1 = aTS1.tokens.elementAt(--x);
-			}
-			else {
-				aP.t2 = aTS2.tokens.elementAt(--y);
-			}
-			aPs.add(aP);
-		}
-		
-		//Reverse order
-		Vector<Pair> aPOs = new Vector<Pair>();
-		for(int p = aPs.size()-1;p >= 0;p--) {
-			aPOs.add(aPs.elementAt(p));
-		}
-		
-		return aPOs;
-	}
-	
-	double cost(Token aT1,Token aT2) {
-		if(aT1.kind != aT2.kind) {
-			return COST_INCREDIBLE;
-		}
-		if(aT1.token.equals(aT2.token)
-				|| (ignoreCase && aT1.token.equalsIgnoreCase(aT2.token))) {
-			return 0
-					+(aT1.tokPos+aT2.tokPos)*compressPosFactor;
-		}
-		if(aT1.token.equalsIgnoreCase(aT2.token)) {
-			return 0.01
-					+(aT1.tokPos+aT2.tokPos)*compressPosFactor;
-		}
-		if(aT1.token.trim().equalsIgnoreCase(aT2.token.trim())) {
-			return 0.02
-					+(aT1.tokPos+aT2.tokPos)*compressPosFactor;
-		}
-		String aT1LC = aT1.tokenLC();
-		String aT2LC = aT2.tokenLC();
-		if(aT1LC.startsWith(aT2LC)
-				|| aT1LC.endsWith(aT2.token.toLowerCase())
-				|| aT2LC.startsWith(aT1LC)
-				|| aT2LC.endsWith(aT1LC)
-				|| (aT1LC.length() > 2 && aT2LC.length() > 2 && 
-						(aT1LC.indexOf(aT2LC) >= 0 || aT2LC.indexOf(aT1LC) >= 0))) {//Segmentation problem ?
-			return 1.0 - 2.0*Math.min(aT1.token.length(),aT2.token.length())/(double)(aT1.token.length()+aT2.token.length())
-					+(aT1.tokPos+aT2.tokPos)*compressPosFactor;
-		}
-		return 2.0 - 2.0*Math.min(aT1.token.length(),aT2.token.length())/(double)(aT1.token.length()+aT2.token.length())
-				+(aT1.tokPos+aT2.tokPos)*compressPosFactor;
-	}
-	
-	double cost(Token aT) {
-		if(aT.token.trim().length() == 0) {
-			//Blank
-			return 0.1;
-		}
-		return 1.0;
-	}
+    boolean ignoreCase = false;
+    double compressPosFactor =
+            //0;
+            1.0 / 100000.0;
+
+    public CubaixAlignerSimple(boolean aIgnoreCase) {
+        ignoreCase = aIgnoreCase;
+    }
+
+    public TokenizedSent syncMarks1to2(TokenizedSent aTS1, TokenizedSent aTS2) throws Exception {
+        Vector<Pair> aP12s = align(aTS1, aTS2);
+        TokenizedSent aFused = new TokenizedSent(null);
+        if (_DEBUG) {
+            System.out.println("\nSYNC: \n");
+        }
+        for (int p = 0; p < aP12s.size(); p++) {
+            Pair aP12 = aP12s.elementAt(p);
+            if (_DEBUG) {
+                System.out.println(
+                        (aP12.t1 == null ? "[✘]" : "[" + aP12.t1.token.replaceAll("\r*\n", "\\\\n") + "]" + aP12.t1.kind)
+                                + "\t" + (aP12.t1 == null || aP12.t2 == null || !aP12.t1.token.equals(aP12.t2.token) ? "≠" : "=") + "\t"
+                                + (aP12.t2 == null ? "[✘]" : "[" + aP12.t2.token.replaceAll("\r*\n", "\\\\n") + "]" + aP12.t2.kind)
+                );
+            }
+            if (aP12.t1 != null && aP12.t1.kind == Token.NSTOKEN_KIND.MARK) {
+                aFused.tokens.add(aP12.t1);
+            }
+            if (aP12.t2 != null && aP12.t2.kind != Token.NSTOKEN_KIND.MARK) {
+                aFused.tokens.add(aP12.t2);
+            }
+        }
+        return aFused;
+    }
+
+    public Vector<Pair> align(TokenizedSent aTS1, TokenizedSent aTS2) throws Exception {
+        //Init
+        int[][] aChoices = new int[aTS1.tokens.size() + 1][aTS2.tokens.size() + 1];
+        double[][] aCosts = new double[aTS1.tokens.size() + 1][aTS2.tokens.size() + 1];
+        aChoices[0][0] = 0;
+        aCosts[0][0] = 0;
+        for (int x = 1; x < aTS1.tokens.size() + 1; x++) {
+            aChoices[x][0] = 1;//Left
+            aCosts[x][0] = aCosts[x - 1][0] + cost(aTS1.tokens.elementAt(x - 1));
+        }
+        for (int y = 1; y < aTS2.tokens.size() + 1; y++) {
+            aChoices[0][y] = 2;//Up
+            aCosts[0][y] = aCosts[0][y - 1] + cost(aTS2.tokens.elementAt(y - 1));
+        }
+        //Eval costs
+        for (int x = 1; x < aTS1.tokens.size() + 1; x++) {
+            for (int y = 1; y < aTS2.tokens.size() + 1; y++) {
+                double aCost = cost(aTS1.tokens.elementAt(x - 1), aTS2.tokens.elementAt(y - 1));
+                double aCost0 = aCosts[x - 1][y - 1] + aCost * 0.99;
+                double aCost1 = aCosts[x - 1][y] + cost(aTS1.tokens.elementAt(x - 1));
+                double aCost2 = aCosts[x][y - 1] + cost(aTS2.tokens.elementAt(y - 1));
+                if (aCost0 <= aCost1 && aCost0 <= aCost2) {
+                    aChoices[x][y] = 0;//Match
+                    aCosts[x][y] = aCost0;
+                } else if (aCost1 < aCost2) {
+                    aChoices[x][y] = 1;//Left
+                    aCosts[x][y] = aCost1;
+                } else {
+                    aChoices[x][y] = 2;//Up
+                    aCosts[x][y] = aCost2;
+                }
+            }
+        }
+
+        //Backprop
+        int x = aTS1.tokens.size();
+        int y = aTS2.tokens.size();
+        Vector<Pair> aPs = new Vector<Pair>();
+        while (x > 0 || y > 0) {
+            Pair aP = new Pair();
+            if (aChoices[x][y] == 0) {
+                aP.t1 = aTS1.tokens.elementAt(--x);
+                aP.t2 = aTS2.tokens.elementAt(--y);
+            } else if (aChoices[x][y] == 1) {
+                aP.t1 = aTS1.tokens.elementAt(--x);
+            } else {
+                aP.t2 = aTS2.tokens.elementAt(--y);
+            }
+            aPs.add(aP);
+        }
+
+        //Reverse order
+        Vector<Pair> aPOs = new Vector<Pair>();
+        for (int p = aPs.size() - 1; p >= 0; p--) {
+            aPOs.add(aPs.elementAt(p));
+        }
+
+        return aPOs;
+    }
+
+    double cost(Token aT1, Token aT2) {
+        if (aT1.kind != aT2.kind) {
+            return COST_INCREDIBLE;
+        }
+        if (aT1.token.equals(aT2.token)
+                || (ignoreCase && aT1.token.equalsIgnoreCase(aT2.token))) {
+            return 0
+                    + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
+        }
+        if (aT1.token.equalsIgnoreCase(aT2.token)) {
+            return 0.01
+                    + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
+        }
+        if (aT1.token.trim().equalsIgnoreCase(aT2.token.trim())) {
+            return 0.02
+                    + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
+        }
+        String aT1LC = aT1.tokenLC();
+        String aT2LC = aT2.tokenLC();
+        if (aT1LC.startsWith(aT2LC)
+                || aT1LC.endsWith(aT2.token.toLowerCase())
+                || aT2LC.startsWith(aT1LC)
+                || aT2LC.endsWith(aT1LC)
+                || (aT1LC.length() > 2 && aT2LC.length() > 2 &&
+                (aT1LC.indexOf(aT2LC) >= 0 || aT2LC.indexOf(aT1LC) >= 0))) {//Segmentation problem ?
+            return 1.0 - 2.0 * Math.min(aT1.token.length(), aT2.token.length()) / (double) (aT1.token.length() + aT2.token.length())
+                    + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
+        }
+        return 2.0 - 2.0 * Math.min(aT1.token.length(), aT2.token.length()) / (double) (aT1.token.length() + aT2.token.length())
+                + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
+    }
+
+    double cost(Token aT) {
+        if (aT.token.trim().length() == 0) {
+            //Blank
+            return 0.1;
+        }
+        return 1.0;
+    }
 
 }
