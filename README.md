@@ -101,3 +101,10 @@ See: http://cubaix.com/ComPair_QuickStartGuide.php
 This tool is a demonstration of our know-how.<br/>
 If you are interested in a commercial/industrial AI linguistic project, contact us:<br/>
 https://cubaix.com
+
+## Build
+```
+$ mkdir -p bin distrib
+$ javac -d bin src/com/cubAIx/WhisperTimeSync/*.java
+$ jar --create --file distrib/WhisperTimeSync.jar --main-class com.cubAIx.WhisperTimeSync.WhisperTimeSync -C bin com
+```
