@@ -6,6 +6,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class WhisperTimeSync {
 	static final boolean _DEBUG_INOUT = false;
@@ -78,13 +82,36 @@ public class WhisperTimeSync {
 				);
 		TokenizedSent aSyncTS = aAligner.syncMarks1to2(aSrtTS, aTxtTS);
 
+		final List<Token> tokens = new ArrayList<>();
+		int i = 0;
+		while (i < aSyncTS.tokens.size()) {
+			Token t = aSyncTS.tokens.get(i);
+			if (t.kind == Token.NSTOKEN_KIND.MARK) {
+				// Collect all consecutive MARKs
+				int j = i + 1;
+				while (j < aSyncTS.tokens.size()
+						&& aSyncTS.tokens.get(j).kind == Token.NSTOKEN_KIND.MARK) {
+					j++;
+				}
+				// Keep ONLY the LAST MARK from this run
+				tokens.add(aSyncTS.tokens.get(j - 1));
+				i = j;
+			} else {
+				tokens.add(t);
+				i++;
+			}
+		}
+
 		StringBuffer aOut = new StringBuffer();
 		StringBuffer aWaiting = new StringBuffer();
-		for(Token aT : aSyncTS.tokens) {
-			if(aT.kind == Token.NSTOKEN_KIND.MARK) {
-				String aId = aT.getAttr("id");
+		int seq = 0;  // Renumber counter
+
+		for (Token aT : tokens) {
+			if (aT.kind == Token.NSTOKEN_KIND.MARK) {
 				String aStamp = aT.getAttr("stamp");
-				if(aWaiting.length() > 0) {
+
+				// Flush any waiting text BEFORE this mark
+				if (aWaiting.length() > 0) {
 					String aPhrase = aWaiting.toString()
 							.replaceAll("&lt;", "<")
 							.replaceAll("&gt;", ">")
@@ -95,15 +122,21 @@ public class WhisperTimeSync {
 					}
 					aWaiting = new StringBuffer();
 				}
-				aOut.append(aId+"\n"+aStamp+"\n");
-				if(_DEBUG_ALIGN) {
-					System.out.print(aId+"\n"+aStamp+"\n");
+
+				// Increment and use NEW sequential ID
+				seq++;
+				String aId = String.valueOf(seq);
+				aOut.append(aId + "\n" + aStamp + "\n");
+				if (_DEBUG_ALIGN) {
+					System.out.print(aId + "\n" + aStamp + "\n");
 				}
 				continue;
 			}
 			aWaiting.append(aT.token);
 		}
-		if(aWaiting.length() > 0) {
+
+		// Flush remaining text after loop
+		if (aWaiting.length() > 0) {
 			String aPhrase = aWaiting.toString()
 					.replaceAll("&lt;", "<")
 					.replaceAll("&gt;", ">")
