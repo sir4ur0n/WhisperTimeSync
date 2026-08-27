@@ -21,13 +21,13 @@ public class WhisperTimeSync {
     }
 
     String load(String aPath) throws Exception {
-        StringBuffer aSB = new StringBuffer();
+        StringBuilder aSB = new StringBuilder();
         BufferedReader aBR = new BufferedReader(
                 new InputStreamReader(new FileInputStream(aPath)
                         , StandardCharsets.UTF_8));
-        String aLine = null;
+        String aLine;
         while ((aLine = aBR.readLine()) != null) {
-            if (aSB.length() > 0) {
+            if (!aSB.isEmpty()) {
                 aSB.append("\n");
             }
             aSB.append(aLine);
@@ -102,8 +102,8 @@ public class WhisperTimeSync {
             }
         }
 
-        StringBuffer aOut = new StringBuffer();
-        StringBuffer aWaiting = new StringBuffer();
+        StringBuilder aOut = new StringBuilder();
+        StringBuilder aWaiting = new StringBuilder();
         int seq = 0;  // Renumber counter
 
         for (Token aT : tokens) {
@@ -111,7 +111,7 @@ public class WhisperTimeSync {
                 String aStamp = aT.getAttr("stamp");
 
                 // Flush any waiting text BEFORE this mark
-                if (aWaiting.length() > 0) {
+                if (!aWaiting.isEmpty()) {
                     String aPhrase = aWaiting.toString()
                             .replaceAll("&lt;", "<")
                             .replaceAll("&gt;", ">")
@@ -120,13 +120,13 @@ public class WhisperTimeSync {
                     if (_DEBUG_ALIGN) {
                         System.out.print(aPhrase);
                     }
-                    aWaiting = new StringBuffer();
+                    aWaiting = new StringBuilder();
                 }
 
                 // Increment and use NEW sequential ID
                 seq++;
                 String aId = String.valueOf(seq);
-                aOut.append(aId + "\n" + aStamp + "\n");
+                aOut.append(aId).append("\n").append(aStamp).append("\n");
                 if (_DEBUG_ALIGN) {
                     System.out.print(aId + "\n" + aStamp + "\n");
                 }
@@ -136,7 +136,7 @@ public class WhisperTimeSync {
         }
 
         // Flush remaining text after loop
-        if (aWaiting.length() > 0) {
+        if (!aWaiting.isEmpty()) {
             String aPhrase = aWaiting.toString()
                     .replaceAll("&lt;", "<")
                     .replaceAll("&gt;", ">")

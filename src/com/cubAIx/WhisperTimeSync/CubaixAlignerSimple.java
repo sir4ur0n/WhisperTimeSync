@@ -7,7 +7,7 @@ public class CubaixAlignerSimple {
 
     static double COST_INCREDIBLE = 1000000;
 
-    boolean ignoreCase = false;
+    boolean ignoreCase;
     double compressPosFactor =
             //0;
             1.0 / 100000.0;
@@ -41,7 +41,7 @@ public class CubaixAlignerSimple {
         return aFused;
     }
 
-    public Vector<Pair> align(TokenizedSent aTS1, TokenizedSent aTS2) throws Exception {
+    public Vector<Pair> align(TokenizedSent aTS1, TokenizedSent aTS2) {
         //Init
         int[][] aChoices = new int[aTS1.tokens.size() + 1][aTS2.tokens.size() + 1];
         double[][] aCosts = new double[aTS1.tokens.size() + 1][aTS2.tokens.size() + 1];
@@ -78,7 +78,7 @@ public class CubaixAlignerSimple {
         //Backprop
         int x = aTS1.tokens.size();
         int y = aTS2.tokens.size();
-        Vector<Pair> aPs = new Vector<Pair>();
+        Vector<Pair> aPs = new Vector<>();
         while (x > 0 || y > 0) {
             Pair aP = new Pair();
             if (aChoices[x][y] == 0) {
@@ -93,7 +93,7 @@ public class CubaixAlignerSimple {
         }
 
         //Reverse order
-        Vector<Pair> aPOs = new Vector<Pair>();
+        Vector<Pair> aPOs = new Vector<>();
         for (int p = aPs.size() - 1; p >= 0; p--) {
             aPOs.add(aPs.elementAt(p));
         }
@@ -125,7 +125,7 @@ public class CubaixAlignerSimple {
                 || aT2LC.startsWith(aT1LC)
                 || aT2LC.endsWith(aT1LC)
                 || (aT1LC.length() > 2 && aT2LC.length() > 2 &&
-                (aT1LC.indexOf(aT2LC) >= 0 || aT2LC.indexOf(aT1LC) >= 0))) {//Segmentation problem ?
+                (aT1LC.contains(aT2LC) || aT2LC.contains(aT1LC)))) {//Segmentation problem ?
             return 1.0 - 2.0 * Math.min(aT1.token.length(), aT2.token.length()) / (double) (aT1.token.length() + aT2.token.length())
                     + (aT1.tokPos + aT2.tokPos) * compressPosFactor;
         }
@@ -134,7 +134,7 @@ public class CubaixAlignerSimple {
     }
 
     double cost(Token aT) {
-        if (aT.token.trim().length() == 0) {
+        if (aT.token.trim().isEmpty()) {
             //Blank
             return 0.1;
         }

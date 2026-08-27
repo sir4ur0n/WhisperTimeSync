@@ -8,18 +8,10 @@ import java.util.regex.Pattern;
 public class TokenizerSimple {
     static final String PUNCT_ONLY_STRING_RE = "[\r\n\t	  ,  ​،؟;:.!?¡¿。：？！；؟!؛،.ـ()\\[\\]{}<>\"'‘’`´«»‹›„“”*/+=|\\‒–—―‑€$£§%#@&°。：？！；，、（）-]+";
 
-    /**
-     * @param aStrIn
-     * @return
-     */
     public static String transcodeFromHTMLSafe(String aStrIn) {
         return aStrIn.replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&");
     }
 
-    /**
-     * @param aStrIn
-     * @return
-     */
     public static String transcodeFromEntities(String aStrIn) {
         //Search for all possible entities
         String aStrOut = transcodeFromHTMLSafe(aStrIn);
@@ -36,10 +28,10 @@ public class TokenizerSimple {
                 //Not a suitable entity
                 continue;
             }
-            aPos++;
-            while (aPos < aStrOut.length() && ("" + aStrOut.charAt(aPos)).matches("[0-9]")) {
+            do {
                 aPos++;
-            }
+            } while (aPos < aStrOut.length() && ("" + aStrOut.charAt(aPos)).matches("[0-9]"));
+
             if (aPos >= aStrOut.length() || aStrOut.charAt(aPos) != ';') {
                 //Not a suitable entity
                 continue;
@@ -54,23 +46,15 @@ public class TokenizerSimple {
         return aStrOut;
     }
 
-    public static void main(String[] args) {
-        try {
-
-        } catch (Exception e) {
-            e.printStackTrace(System.err);
-        }
-    }
-
     public TokenizedSent tokenizeXmlSimple(String aTxt) throws Exception {
         return tokenizeXmlSimple(aTxt, PUNCT_ONLY_STRING_RE);
     }
 
-    public TokenizedSent tokenizeXmlSimple(String aTxt, String aSeparatorChars) throws Exception {
+    public TokenizedSent tokenizeXmlSimple(String aTxt, String aSeparatorChars) {
         TokenizedSent aTS = new TokenizedSent(aTxt);
         Pattern aPatten = Pattern.compile("<[^>]*>");
         Matcher aMatcher = aPatten.matcher(aTS.text);
-        Vector<String> aParts = new Vector<String>();
+        Vector<String> aParts = new Vector<>();
         int aPos = 0;
         while (aMatcher.find()) {
             if (aMatcher.start() > aPos) {
@@ -153,5 +137,4 @@ public class TokenizerSimple {
         }
         return aTS;
     }
-
 }
